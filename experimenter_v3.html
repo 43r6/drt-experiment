@@ -328,7 +328,7 @@
   const stateRef = ref(db, 'experiment/state');
 
   function sendToFirebase(data) {
-    set(stateRef, { ...data, timestamp: Date.now() });
+    set(stateRef, { ...data, timestamp: Date.now() + Math.random() });
   }
 
   let currentScenario = 1, currentCondition = 'A', currentPayload = 'normal', currentErrorLocation = 'dep';

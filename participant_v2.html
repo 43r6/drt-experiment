@@ -296,10 +296,17 @@
   const db = getDatabase(_app);
   const stateRef = ref(db, 'experiment/state');
 
+  let lastTimestamp = 0;
+
   onValue(stateRef, (snapshot) => {
     const data = snapshot.val();
     if (!data) return;
+    // timestamp가 같으면 무시 (중복 실행 방지)
+    if (data.timestamp === lastTimestamp) return;
+    lastTimestamp = data.timestamp;
+
     const { type, scenario, condition, state, payload, errorLocation } = data;
+    console.log('Firebase 수신:', type, state); // 디버깅용
     if (type === 'SET_SCENARIO') { sc = scenario; reset(); }
     if (type === 'SET_CONDITION') { cond = condition; reset(); }
     if (type === 'SET_ERROR_LOCATION') { errorLoc = errorLocation; reset(); }
