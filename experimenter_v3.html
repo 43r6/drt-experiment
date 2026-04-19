@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>실험자 제어판 — DRT 실험</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a; --border: #2e3347;
+    --primary: #4a90e2; --success: #34c97a; --warning: #f59e0b; --error: #ef4444;
+    --text: #e8eaf0; --text-muted: #6b7a99; --accent: #7c6fee; --confirm: #b45309;
+  }
+  body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 24px; }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+
+  /* 상태바 — 최상단 단일 박스 */
+  .status-bar-top { display: flex; align-items: center; gap: 20px; margin-bottom: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 20px; flex-wrap: wrap; }
+  .status-item { display: flex; align-items: center; gap: 8px; }
+  .status-item .slabel { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; white-space: nowrap; }
+  .status-item .sval { font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .status-divider { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+
+  .layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; max-width: 1100px; }
+  .side-panel { display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .card-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .seg-btn { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-align: left; margin-bottom: 6px; transition: all 0.15s; }
+  .seg-btn:last-child { margin-bottom: 0; }
+  .seg-btn:hover { background: #2a2f45; }
+  .seg-btn.active { background: var(--primary); border-color: var(--primary); color: white; }
+  .seg-btn .sub { font-size: 11px; opacity: 0.65; margin-bottom: 2px; }
+  .seg-btn .main { font-size: 13px; font-weight: 600; }
+  .cond-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cond-btn { padding: 14px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; text-align: center; line-height: 1.5; transition: all 0.15s; }
+  .cond-btn:hover { background: #2a2f45; }
+  .cond-btn.active { background: var(--primary); border-color: var(--primary); color: white; }
+  .cond-btn .sub { font-size: 11px; opacity: 0.65; margin-bottom: 4px; }
+  .cond-btn .main { font-size: 14px; font-weight: 700; }
+  .status-chips { display: flex; flex-direction: column; gap: 8px; }
+  .status-chip { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .status-chip .slabel { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
+  .status-chip .sval { font-size: 14px; font-weight: 700; }
+  .dot-live { width: 7px; height: 7px; border-radius: 50%; background: var(--success); display: inline-block; margin-right: 5px; animation: blink 2s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .flow-panel { display: flex; flex-direction: column; gap: 12px; }
+  .flow-section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .section-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+  .section-note { font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+
+  .payload-label { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; }
+  .payload-row { display: flex; gap: 6px; margin-bottom: 14px; }
+  .payload-btn { flex: 1; padding: 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; }
+  .payload-btn.active-normal { background: var(--success); border-color: var(--success); color: #0a1f12; }
+  .payload-btn.active-error  { background: var(--error);   border-color: var(--error);   color: white; }
+
+  .flow-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .flow-btn { padding: 14px 6px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 11px; font-weight: 500; cursor: pointer; text-align: center; line-height: 1.5; transition: all 0.15s; }
+  .flow-btn:hover { background: #2a2f45; border-color: #3d4460; }
+  .flow-btn .fnum { font-size: 9px; opacity: 0.5; margin-bottom: 3px; }
+  .flow-btn .fname { font-size: 11px; font-weight: 600; }
+
+  .flow-btn.t-idle.active     { background: #3b4a6b; border-color: #4a5a8a; }
+  .flow-btn.t-wave.active     { background: var(--warning); border-color: var(--warning); color: #1a1206; }
+  .flow-btn.t-normal.active   { background: var(--success); border-color: var(--success); color: #0a1f12; }
+  .flow-btn.t-error.active    { background: var(--error);   border-color: var(--error);   color: white; }
+  .flow-btn.t-confirm.active  { background: var(--confirm); border-color: var(--confirm); color: white; }
+  .flow-btn.t-dest.active     { background: var(--primary); border-color: var(--primary); color: white; }
+  .flow-btn.t-complete.active { background: var(--accent);  border-color: var(--accent);  color: white; }
+  .flow-btn.t-normal  { border-color: rgba(52,201,122,0.3); }
+  .flow-btn.t-error   { border-color: rgba(239,68,68,0.3); }
+  .flow-btn.t-confirm { border-color: rgba(180,83,9,0.3); }
+  .flow-btn.t-complete{ border-color: rgba(124,111,238,0.3); }
+  .flow-btn.disabled { opacity: 0.25; pointer-events: none; }
+
+  .hint { font-size: 11px; color: var(--text-muted); margin-top: 10px; line-height: 1.6; }
+  .hint span { color: var(--warning); font-weight: 600; }
+  .condition-note { background: rgba(74,144,226,0.07); border: 1px solid rgba(74,144,226,0.18); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+  .condition-note strong { color: var(--primary); }
+  .reset-btn { background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted); font-family: 'Noto Sans KR', sans-serif; font-size: 12px; padding: 7px 14px; cursor: pointer; transition: all 0.15s; margin-top: 4px; }
+  .reset-btn:hover { color: var(--text); border-color: #3d4460; }
+  .miss-btn { background: rgba(245,158,11,0.15); border: 1px solid var(--warning); border-radius: 8px; color: var(--warning); font-family: 'Noto Sans KR', sans-serif; font-size: 12px; font-weight: 600; padding: 7px 14px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .miss-btn:hover { background: rgba(245,158,11,0.3); }
+  .log-entry { padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; }
+  .log-entry.miss { background: rgba(245,158,11,0.1); color: var(--warning); }
+  .log-entry.info { background: rgba(74,144,226,0.1); color: var(--primary); }
+</style>
+</head>
+<body>
+
+<h1>🎛 실험자 제어판</h1>
+<p class="subtitle">participant.html과 같은 브라우저에서 열어주세요. · 피드백 시점: 발화 중 실시간 고정</p>
+
+<!-- 현재 상태 — 최상단 단일 박스 -->
+<div class="status-bar-top">
+  <div class="status-item"><span class="slabel"><span class="dot-live"></span>연결</span><span class="sval">활성</span></div>
+  <div class="status-divider"></div>
+  <div class="status-item"><span class="slabel">시나리오</span><span class="sval" id="statusScenario">시나리오 1</span></div>
+  <div class="status-divider"></div>
+  <div class="status-item"><span class="slabel">조건</span><span class="sval" id="statusCondition">조건 A</span></div>
+  <div class="status-divider"></div>
+  <div class="status-item"><span class="slabel">오류 위치</span><span class="sval" id="statusErrorLoc">출발지</span></div>
+  <div class="status-divider"></div>
+  <div class="status-item"><span class="slabel">단계</span><span class="sval" id="statusState">대기</span></div>
+</div>
+
+<div class="layout">
+  <!-- 왼쪽 -->
+  <div class="side-panel">
+    <div class="card">
+      <div class="card-title">① 시나리오</div>
+      <button class="seg-btn" id="s0btn" onclick="setScenario(0)">
+        <div class="sub">연습</div><div class="main">✅ 정상 흐름 연습</div>
+      </button>
+      <button class="seg-btn active" id="s1btn" onclick="setScenario(1)">
+        <div class="sub">시나리오 1</div><div class="main">유사 장소명 혼동</div>
+      </button>
+      <button class="seg-btn" id="s2btn" onclick="setScenario(2)">
+        <div class="sub">시나리오 2</div><div class="main">비공식 장소명 사용</div>
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">② 실험 조건</div>
+      <div class="cond-grid">
+        <button class="cond-btn active" id="cAbtn" onclick="setCondition('A')">
+          <div class="sub">조건 A</div>
+          <div class="main">텍스트만</div>
+        </button>
+        <button class="cond-btn" id="cBbtn" onclick="setCondition('B')">
+          <div class="sub">조건 B</div>
+          <div class="main">텍스트+지도</div>
+        </button>
+      </div>
+    </div>
+
+    <div class="card" id="errorLocationCard">
+      <div class="card-title">③ 오류 발생 위치</div>
+      <div class="cond-grid">
+        <button class="cond-btn active" id="elDepBtn" onclick="setErrorLocation('dep')">
+          <div class="sub">출발지</div>
+          <div class="main">출발지 오류</div>
+        </button>
+        <button class="cond-btn" id="elDestBtn" onclick="setErrorLocation('dest')">
+          <div class="sub">목적지</div>
+          <div class="main">목적지 오류</div>
+        </button>
+      </div>
+      <p id="errorLocationNote" style="font-size:12px;color:var(--text-muted);margin-top:10px;line-height:1.6;"></p>
+    </div>
+
+    <button class="reset-btn" onclick="fullReset()">↺ 전체 초기화</button>
+  </div>
+
+  <!-- 오른쪽 -->
+  <div class="flow-panel">
+
+    <div class="condition-note">
+      <strong id="condTitle">조건 A — 발화 중 실시간 + 텍스트만</strong><br>
+      <span id="condDesc">발화 도중 실시간으로 텍스트 팝업이 나타납니다. 지도는 표시되지 않습니다.</span>
+    </div>
+
+    <!-- 출발지 -->
+    <div class="flow-section">
+      <div class="section-label">출발지 흐름</div>
+      <p class="section-note" id="depNote" style="color:var(--error)">⚠️ 출발지 오류 발생</p>
+
+      <!-- 출발지 정상 세트 -->
+      <div id="depNormalSet">
+        <div class="payload-label">✅ 정상 흐름</div>
+        <div class="flow-grid">
+          <button class="flow-btn t-idle active" id="fb_idle" onclick="setState('idle')">
+            <div class="fnum">STEP 0</div><div class="fname">🎙 대기</div>
+          </button>
+          <button class="flow-btn t-idle" id="fb_dep_q" onclick="setState('dep_question')">
+            <div class="fnum">STEP 1</div><div class="fname">❓ 출발지<br>질문</div>
+          </button>
+          <button class="flow-btn t-wave" id="fb_dep_s" onclick="setState('dep_speaking')">
+            <div class="fnum">STEP 2</div><div class="fname">🔊 발화 중</div>
+          </button>
+          <button class="flow-btn t-normal" id="fb_dep_rt_n" onclick="setState('dep_rt_normal')">
+            <div class="fnum">STEP 3</div><div class="fname">✅ 실시간<br>정상</div>
+          </button>
+          <button class="flow-btn t-confirm" id="fb_dep_confirm_n" onclick="setState('dep_confirm_normal')">
+            <div class="fnum">STEP 4</div><div class="fname">🔔 확인<br>질문</div>
+          </button>
+          <button class="flow-btn t-wave" id="fb_dep_cs_n" onclick="setState('dep_confirm_speaking_normal')">
+            <div class="fnum">STEP 5</div><div class="fname">🔊 확인<br>발화 중</div>
+          </button>
+          <button class="flow-btn t-normal" id="fb_dep_confirmed" onclick="setState('dep_confirmed')">
+            <div class="fnum">STEP 6</div><div class="fname">✅ 출발지<br>확정</div>
+          </button>
+          <div></div>
+        </div>
+        <p class="hint">출발지 확정 후 → <span>목적지 흐름 STEP 7</span></p>
+      </div>
+
+      <!-- 출발지 오류 세트 -->
+      <div id="depErrorSet" style="margin-top:12px;">
+        <div class="payload-label">❌ 오류 흐름</div>
+        <div class="flow-grid">
+          <button class="flow-btn t-idle" id="fb_dep_q2" onclick="setState('dep_question')">
+            <div class="fnum">STEP 1</div><div class="fname">❓ 출발지<br>질문</div>
+          </button>
+          <button class="flow-btn t-wave" id="fb_dep_s2" onclick="setState('dep_speaking')">
+            <div class="fnum">STEP 2</div><div class="fname">🔊 발화 중</div>
+          </button>
+          <button class="flow-btn t-error" id="fb_dep_rt_e" onclick="setState('dep_rt_error')">
+            <div class="fnum">STEP 3</div><div class="fname">❌ 실시간<br>오류</div>
+          </button>
+          <button class="flow-btn t-confirm" id="fb_dep_confirm_e" onclick="setState('dep_confirm_error')">
+            <div class="fnum">STEP 4a</div><div class="fname">🔔 확인<br>질문(오류)</div>
+          </button>
+          <button class="flow-btn t-wave" id="fb_dep_cs_e" onclick="setState('dep_confirm_speaking_error')">
+            <div class="fnum">STEP 5a</div><div class="fname">🔊 확인<br>발화(오류)</div>
+          </button>
+          <button class="flow-btn t-error" id="fb_dep_confirmed_e" onclick="setState('dep_confirmed_error')">
+            <div class="fnum">STEP 6a</div><div class="fname">⚠️ 출발지<br>확정(오류)</div>
+          </button>
+          <div></div>
+        </div>
+        <p class="hint">피험자 "네"(오류 미인지) → <span>STEP 6a 출발지 확정(오류)</span> 후 목적지로</p>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="miss-btn" id="depMissBtn" onclick="recordMiss('dep')" style="display:none;">⚠️ 오류 미인지 기록</button>
+        </div>
+      </div>
+      <!-- 수정발화 전환 버튼: depErrorSet 밖에 위치시켜 pointerEvents 영향 없음 -->
+      <div id="depUnlockWrap" style="margin-top:8px;display:none;">
+        <button class="flow-btn t-normal" style="padding:9px 14px;font-size:12px;width:100%;" onclick="unlockDepNormal()">🔄 수정 발화 발생 → 정상 흐름 전환</button>
+      </div>
+    </div>
+
+    <!-- 목적지 -->
+    <div class="flow-section">
+      <div class="section-label">목적지 흐름</div>
+      <p class="section-note" id="destNote" style="color:var(--success)">✅ 목적지 정상 인식</p>
+
+      <!-- 목적지 정상 세트 -->
+      <div id="destNormalSet">
+        <div class="payload-label">✅ 정상 흐름</div>
+        <div class="flow-grid">
+          <button class="flow-btn t-dest" id="fb_dest_q" onclick="setState('dest_question')">
+            <div class="fnum">STEP 6</div><div class="fname">❓ 목적지<br>질문</div>
+          </button>
+          <button class="flow-btn t-wave" id="fb_dest_s" onclick="setState('dest_speaking')">
+            <div class="fnum">STEP 7</div><div class="fname">🔊 발화 중</div>
+          </button>
+          <button class="flow-btn t-normal" id="fb_dest_rt_n" onclick="setState('dest_rt_normal')">
+            <div class="fnum">STEP 8</div><div class="fname">✅ 실시간<br>정상</div>
+          </button>
+          <button class="flow-btn t-confirm" id="fb_dest_confirm_n" onclick="setState('dest_confirm_normal')">
+            <div class="fnum">STEP 9</div><div class="fname">🔔 확인<br>질문</div>
+          </button>
+          <button class="flow-btn t-wave" id="fb_dest_cs_n" onclick="setState('dest_confirm_speaking_normal')">
+            <div class="fnum">STEP 10</div><div class="fname">🔊 확인<br>발화 중</div>
+          </button>
+          <button class="flow-btn t-complete" id="fb_complete" onclick="setState('complete')">
+            <div class="fnum">STEP 11</div><div class="fname">🎉 호출<br>완료</div>
+          </button>
+          <div></div><div></div>
+        </div>
+      </div>
+
+      <!-- 목적지 오류 세트 -->
+      <div id="destErrorSet" style="margin-top:12px;">
+        <div class="payload-label">❌ 오류 흐름</div>
+        <div class="flow-grid">
+          <button class="flow-btn t-dest" id="fb_dest_q2" onclick="setState('dest_question')">
+            <div class="fnum">STEP 6</div><div class="fname">❓ 목적지<br>질문</div>
+          </button>
+          <button class="flow-btn t-wave" id="fb_dest_s2" onclick="setState('dest_speaking')">
+            <div class="fnum">STEP 7</div><div class="fname">🔊 발화 중</div>
+          </button>
+          <button class="flow-btn t-error" id="fb_dest_rt_e" onclick="setState('dest_rt_error')">
+            <div class="fnum">STEP 8</div><div class="fname">❌ 실시간<br>오류</div>
+          </button>
+          <button class="flow-btn t-confirm" id="fb_dest_confirm_e" onclick="setState('dest_confirm_error')">
+            <div class="fnum">STEP 9a</div><div class="fname">🔔 확인<br>질문(오류)</div>
+          </button>
+          <button class="flow-btn t-wave" id="fb_dest_cs_e" onclick="setState('dest_confirm_speaking_error')">
+            <div class="fnum">STEP 10a</div><div class="fname">🔊 확인<br>발화(오류)</div>
+          </button>
+          <button class="flow-btn t-complete" id="fb_complete2" onclick="setState('complete')">
+            <div class="fnum">STEP 11</div><div class="fname">🎉 호출<br>완료</div>
+          </button>
+          <div></div><div></div>
+        </div>
+        <p class="hint">피험자 "네"(오류 미인지) → <span>STEP 11 호출완료</span> · 피험자 수정 발화 → 아래 버튼 누른 후 정상 흐름 STEP 9b 진행</p>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="miss-btn" id="destMissBtn" onclick="recordMiss('dest')" style="display:none;">⚠️ 오류 미인지 기록</button>
+        </div>
+      </div>
+      <!-- 수정발화 전환 버튼: destErrorSet 밖에 위치시켜 pointerEvents 영향 없음 -->
+      <div id="destUnlockWrap" style="margin-top:8px;display:none;">
+        <button class="flow-btn t-normal" style="padding:9px 14px;font-size:12px;width:100%;" onclick="unlockDestNormal()">🔄 수정 발화 발생 → 정상 흐름 전환</button>
+      </div>
+      </div>
+    </div>
+
+    <!-- 기록 로그 -->
+    <div class="flow-section" id="logSection">
+      <div class="section-label">관찰 기록</div>
+      <div id="logList" style="font-size:12px;color:var(--text-muted);line-height:2;min-height:24px;">기록 없음</div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAp34rx0ZoBngViLTXqiUtCdtQRQKMnTDA",
+    authDomain: "drt-experiment.firebaseapp.com",
+    databaseURL: "https://drt-experiment-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "drt-experiment",
+    storageBucket: "drt-experiment.firebasestorage.app",
+    messagingSenderId: "515540322218",
+    appId: "1:515540322218:web:b389b0f68610a94d5f0dd3"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const stateRef = ref(db, 'experiment/state');
+
+  function sendToFirebase(data) {
+    set(stateRef, { ...data, timestamp: Date.now() });
+  }
+
+  let currentScenario = 1, currentCondition = 'A', currentPayload = 'normal', currentErrorLocation = 'dep';
+
+  // 시나리오별 오류 안내 텍스트 (실험자용)
+  const errorGuide = {
+    0: { dep: null, dest: null }, // 연습: 오류 없음
+    1: {
+      dep:  '출발지 오류: "힐스테이트 파티오포레 4단지" → "힐스테이트 파티오포레 2단지"로 오인식',
+      dest: '목적지 오류: "옥정1동 행정복지센터" → "옥정2동 행정복지센터"로 오인식'
+    },
+    2: {
+      dep:  '출발지 오류: "옥정1동 행정복지센터" → "옥정2동 행정복지센터"로 오인식',
+      dest: '목적지 오류: "4단지(힐스테이트 파티오포레 4단지)" → "월드메르디앙 라피네트 더 테라스 4단지"로 오인식'
+    }
+  };
+
+  const condInfo = {
+    'A': { title: '조건 A — 비공간적 피드백 (텍스트만)', desc: '발화 도중 실시간으로 텍스트 팝업이 나타납니다. 지도는 표시되지 않습니다.' },
+    'B': { title: '조건 B — 공간적 피드백 (텍스트+지도)', desc: '발화 도중 실시간으로 지도 팝업과 텍스트가 함께 나타납니다.' },
+  };
+
+  const stateNames = {
+    idle:'대기',
+    dep_question:'출발지 질문', dep_speaking:'출발지 발화 중',
+    dep_rt_normal:'출발지 실시간 정상', dep_rt_error:'출발지 실시간 오류',
+    dep_confirm_normal:'출발지 확인(정상)', dep_confirm_speaking_normal:'출발지 확인 발화(정상)',
+    dep_confirmed:'출발지 확정',
+    dep_confirm_error:'출발지 확인(오류)', dep_confirm_speaking_error:'출발지 확인 발화(오류)',
+    dep_confirmed_error:'출발지 확정(오류)',
+    dest_question:'목적지 질문', dest_speaking:'목적지 발화 중',
+    dest_rt_normal:'목적지 실시간 정상', dest_rt_error:'목적지 실시간 오류',
+    dest_confirm_normal:'목적지 확인(정상)', dest_confirm_speaking_normal:'목적지 확인 발화(정상)',
+    dest_confirm_error:'목적지 확인(오류)', dest_confirm_speaking_error:'목적지 확인 발화(오류)',
+    complete:'호출 완료'
+  };
+
+  const btnMap = {
+    idle:'fb_idle',
+    dep_question:'fb_dep_q', dep_speaking:'fb_dep_s',
+    dep_rt_normal:'fb_dep_rt_n', dep_rt_error:'fb_dep_rt_e',
+    dep_confirm_normal:'fb_dep_confirm_n', dep_confirm_speaking_normal:'fb_dep_cs_n',
+    dep_confirmed:'fb_dep_confirmed',
+    dep_confirm_error:'fb_dep_confirm_e', dep_confirm_speaking_error:'fb_dep_cs_e',
+    dep_confirmed_error:'fb_dep_confirmed_e',
+    dest_question:'fb_dest_q', dest_speaking:'fb_dest_s',
+    dest_rt_normal:'fb_dest_rt_n', dest_rt_error:'fb_dest_rt_e',
+    dest_confirm_normal:'fb_dest_confirm_n', dest_confirm_speaking_normal:'fb_dest_cs_n',
+    dest_confirm_error:'fb_dest_confirm_e', dest_confirm_speaking_error:'fb_dest_cs_e',
+    complete:'fb_complete'
+  };
+
+  function updateNotes() {
+    const s = currentScenario;
+    const loc = currentErrorLocation;
+    const depNote = document.getElementById('depNote');
+    const destNote = document.getElementById('destNote');
+    const elNote = document.getElementById('errorLocationNote');
+
+    if (s === 0) {
+      depNote.textContent = '✅ 연습: 출발지 항상 정상 인식';
+      depNote.style.color = 'var(--success)';
+      destNote.textContent = '✅ 연습: 목적지 항상 정상 인식';
+      destNote.style.color = 'var(--success)';
+      elNote.textContent = '연습 시나리오는 오류가 발생하지 않습니다.';
+      document.getElementById('errorLocationCard').style.opacity = '0.4';
+      document.getElementById('errorLocationCard').style.pointerEvents = 'none';
+    } else {
+      document.getElementById('errorLocationCard').style.opacity = '1';
+      document.getElementById('errorLocationCard').style.pointerEvents = 'auto';
+      if (loc === 'dep') {
+        depNote.textContent = '⚠️ 출발지에서 오류 발생 (아래 오류 내용 참고)';
+        depNote.style.color = 'var(--error)';
+        destNote.textContent = '✅ 목적지 정상 인식';
+        destNote.style.color = 'var(--success)';
+      } else {
+        depNote.textContent = '✅ 출발지 정상 인식';
+        depNote.style.color = 'var(--success)';
+        destNote.textContent = '⚠️ 목적지에서 오류 발생 (아래 오류 내용 참고)';
+        destNote.style.color = 'var(--error)';
+      }
+      elNote.textContent = errorGuide[s][loc] || '';
+    }
+  }
+
+  function setScenario(s) {
+    currentScenario = s;
+    const label = s === 0 ? '연습' : `시나리오 ${s}`;
+    document.getElementById('statusScenario').textContent = label;
+    ['s0btn','s1btn','s2btn'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+    document.getElementById(`s${s}btn`).classList.add('active');
+    updateNotes();
+    updateFlowButtons();
+    sendToFirebase({ type:'SET_SCENARIO', scenario:s, errorLocation: currentErrorLocation });
+    fullReset();
+  }
+
+  function setErrorLocation(loc) {
+    currentErrorLocation = loc;
+    ['elDepBtn','elDestBtn'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById(loc === 'dep' ? 'elDepBtn' : 'elDestBtn').classList.add('active');
+    document.getElementById('statusErrorLoc').textContent = loc === 'dep' ? '출발지' : '목적지';
+    updateNotes();
+    updateFlowButtons();
+    sendToFirebase({ type:'SET_ERROR_LOCATION', errorLocation: loc });
+    fullReset();
+  }
+
+  function setCondition(c) {
+    currentCondition = c;
+    document.getElementById('statusCondition').textContent = `조건 ${c}`;
+    ['cAbtn','cBbtn'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById(`c${c}btn`).classList.add('active');
+    const info = condInfo[c];
+    document.getElementById('condTitle').textContent = info.title;
+    document.getElementById('condDesc').textContent = info.desc;
+    sendToFirebase({ type:'SET_CONDITION', condition:c });
+    fullReset();
+  }
+
+  let logEntries = [];
+
+  function updateFlowButtons() {
+    const isPractice   = currentScenario === 0;
+    const depHasError  = !isPractice && currentErrorLocation === 'dep';
+    const destHasError = !isPractice && currentErrorLocation === 'dest';
+
+    // 출발지: 오류 세트/정상 세트 통째로 활성/비활성
+    const depNormal = document.getElementById('depNormalSet');
+    const depError  = document.getElementById('depErrorSet');
+    const depUnlock = document.getElementById('depUnlockWrap');
+    depNormal.style.opacity       = depHasError  ? '0.3' : '1';
+    depNormal.style.pointerEvents = depHasError  ? 'none' : 'auto';
+    depError.style.opacity        = depHasError  ? '1'   : '0.3';
+    depError.style.pointerEvents  = depHasError  ? 'auto' : 'none';
+    depUnlock.style.display       = depHasError  ? 'block' : 'none';
+
+    // 목적지: 오류 세트/정상 세트 통째로 활성/비활성
+    const destNormal = document.getElementById('destNormalSet');
+    const destError  = document.getElementById('destErrorSet');
+    const destUnlock = document.getElementById('destUnlockWrap');
+    destNormal.style.opacity       = destHasError ? '0.3' : '1';
+    destNormal.style.pointerEvents = destHasError ? 'none' : 'auto';
+    destError.style.opacity        = destHasError ? '1'   : '0.3';
+    destError.style.pointerEvents  = destHasError ? 'auto' : 'none';
+    destUnlock.style.display       = destHasError ? 'block' : 'none';
+
+    // 연습: 오류 세트 모두 비활성, 정상 세트만 활성
+    if (isPractice) {
+      depNormal.style.opacity  = '1';  depNormal.style.pointerEvents  = 'auto';
+      depError.style.opacity   = '0.3'; depError.style.pointerEvents  = 'none';
+      depUnlock.style.display  = 'none';
+      destNormal.style.opacity = '1';  destNormal.style.pointerEvents = 'auto';
+      destError.style.opacity  = '0.3'; destError.style.pointerEvents = 'none';
+      destUnlock.style.display = 'none';
+    }
+
+    // 오류 미인지 버튼 및 수정발화 전환 버튼
+    document.getElementById('depMissBtn').style.display    = depHasError  ? 'inline-block' : 'none';
+    document.getElementById('destMissBtn').style.display   = destHasError ? 'inline-block' : 'none';
+    document.getElementById('depUnlockWrap').style.display  = depHasError  ? 'block' : 'none';
+    document.getElementById('destUnlockWrap').style.display = destHasError ? 'block' : 'none';
+  }
+
+  function unlockDepNormal() {
+    const depNormal = document.getElementById('depNormalSet');
+    depNormal.style.opacity = '1';
+    depNormal.style.pointerEvents = 'auto';
+    addLog(`출발지 수정 발화 발생 — 정상 흐름 전환`);
+  }
+
+  function unlockDestNormal() {
+    const destNormal = document.getElementById('destNormalSet');
+    destNormal.style.opacity = '1';
+    destNormal.style.pointerEvents = 'auto';
+    addLog(`목적지 수정 발화 발생 — 정상 흐름 전환`);
+  }
+
+  function recordMiss(location) {
+    const now = new Date().toLocaleTimeString('ko-KR');
+    const label = location === 'dep' ? '출발지' : '목적지';
+    const scenarioLabel = currentScenario === 0 ? '연습' : `시나리오 ${currentScenario}`;
+    const entry = `[${now}] ${scenarioLabel} / 조건 ${currentCondition} — ${label} 오류 미인지 통과`;
+    logEntries.push({ type: 'miss', text: entry });
+    renderLog();
+  }
+
+  function addLog(text) {
+    const now = new Date().toLocaleTimeString('ko-KR');
+    logEntries.push({ type: 'info', text: `[${now}] ${text}` });
+    renderLog();
+  }
+
+  function renderLog() {
+    const el = document.getElementById('logList');
+    if (logEntries.length === 0) { el.textContent = '기록 없음'; return; }
+    el.innerHTML = logEntries.map(e =>
+      `<div class="log-entry ${e.type}">${e.text}</div>`
+    ).join('');
+  }
+
+  function setState(state) {
+    // 오류 위치에 따라 payload 자동 결정
+    const isErrorState = state.includes('_rt_error') || state.includes('_rt_e');
+    const payload = isErrorState ? 'error' : 'normal';
+
+    document.getElementById('statusState').textContent = stateNames[state] || state;
+    Object.values(btnMap).forEach(id => document.getElementById(id)?.classList.remove('active'));
+    document.getElementById(btnMap[state])?.classList.add('active');
+    sendToFirebase({ type:'SET_STATE', state, payload, errorLocation: currentErrorLocation });
+  }
+
+  function fullReset() { setState('idle'); updateFlowButtons(); }
+
+  // 초기화
+  setCondition('A');
+  setScenario(1);
+  setErrorLocation('dep');
+</script>
+</body>
+</html>

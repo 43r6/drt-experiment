@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>DRT 호출 서비스</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #f0f4f8; --surface: #ffffff; --primary: #3b7dd8;
+    --primary-light: #e8f0fb; --text: #1a2332; --text-muted: #6b7c93;
+    --border: #dde3ec; --wave: #3b7dd8;
+  }
+  body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .phone-frame { width: 390px; height: 844px; background: var(--surface); border-radius: 40px; box-shadow: 0 30px 80px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+  .status-bar { height: 44px; background: #f7f9fc; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 13px; font-weight: 500; color: var(--text); flex-shrink: 0; }
+  .header { background: var(--surface); padding: 12px 20px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .pause-btn { width: 36px; height: 36px; background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+  .end-btn { background: var(--primary); color: white; border: none; border-radius: 20px; padding: 8px 18px; font-size: 14px; font-weight: 500; font-family: 'Noto Sans KR', sans-serif; cursor: pointer; }
+  .content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 20px 20px 30px; position: relative; }
+
+  /* 질문 박스 */
+  .question-box { background: var(--primary-light); border-radius: 16px; padding: 16px 20px; width: 100%; text-align: center; border: 1px solid rgba(59,125,216,0.15); transition: background 0.3s, border-color 0.3s; }
+  .question-box.confirm { background: #fff8e1; border-color: rgba(245,158,11,0.3); }
+  .question-box p { font-size: 17px; font-weight: 500; color: var(--text); line-height: 1.6; }
+
+  /* AI 캐릭터 */
+  .ai-character { width: 180px; height: 180px; border-radius: 50%; background: linear-gradient(135deg, #e8f0fb 0%, #d0e3ff 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ai-character svg { width: 140px; height: 140px; }
+
+  /* 피드백 영역 — 확인 단계 결과 표시용 */
+  .feedback-area { width: 100%; min-height: 80px; max-height: 240px; background: #f7f9fc; border-radius: 20px; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: hidden; }
+
+  /* 음파 */
+  .wave-container { display: flex; align-items: center; gap: 4px; height: 40px; }
+  .wave-bar { width: 4px; background: var(--wave); border-radius: 2px; animation: wave 1s ease-in-out infinite; opacity: 0.8; }
+  .wave-bar:nth-child(1){animation-delay:0s;height:12px} .wave-bar:nth-child(2){animation-delay:0.1s;height:20px} .wave-bar:nth-child(3){animation-delay:0.2s;height:32px} .wave-bar:nth-child(4){animation-delay:0.3s;height:40px} .wave-bar:nth-child(5){animation-delay:0.4s;height:28px} .wave-bar:nth-child(6){animation-delay:0.3s;height:40px} .wave-bar:nth-child(7){animation-delay:0.2s;height:32px} .wave-bar:nth-child(8){animation-delay:0.1s;height:20px} .wave-bar:nth-child(9){animation-delay:0s;height:12px}
+  @keyframes wave { 0%,100%{transform:scaleY(0.4)} 50%{transform:scaleY(1)} }
+
+  /* 확인 단계 텍스트 결과 */
+  .text-feedback { width: 100%; text-align: center; }
+  .text-feedback .label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 400; }
+  .text-feedback .recognized-text { font-size: 18px; font-weight: 600; color: var(--text); line-height: 1.5; }
+
+  /* 확인 단계 지도 결과 */
+  .map-feedback { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+  .map-container { width: 100%; border-radius: 14px; overflow: hidden; background: #e8edf2; }
+  .map-container img { width: 100%; height: auto; display: block; }
+  .map-container.compact { height: 60px; }
+  .map-container.compact img { width: 100%; height: 100%; object-fit: cover; }
+  .map-text { background: white; border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; border: 2px solid var(--border); }
+  .map-text .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+  .map-text span { font-size: 15px; font-weight: 600; color: var(--text); }
+
+  /* 확인 발화 중 음파 */
+  .confirm-wave { display: flex; align-items: center; justify-content: center; gap: 3px; height: 24px; margin-top: 6px; }
+  .confirm-wave .cw-bar { width: 3px; background: #e53935; border-radius: 2px; opacity: 0.7; animation: wave 0.8s ease-in-out infinite; }
+  .confirm-wave .cw-bar:nth-child(1){animation-delay:0s;height:8px} .confirm-wave .cw-bar:nth-child(2){animation-delay:0.1s;height:14px} .confirm-wave .cw-bar:nth-child(3){animation-delay:0.2s;height:20px} .confirm-wave .cw-bar:nth-child(4){animation-delay:0.3s;height:24px} .confirm-wave .cw-bar:nth-child(5){animation-delay:0.4s;height:18px} .confirm-wave .cw-bar:nth-child(6){animation-delay:0.3s;height:24px} .confirm-wave .cw-bar:nth-child(7){animation-delay:0.2s;height:20px} .confirm-wave .cw-bar:nth-child(8){animation-delay:0.1s;height:14px} .confirm-wave .cw-bar:nth-child(9){animation-delay:0s;height:8px}
+
+  /* 호출 완료 */
+  .complete-feedback { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 8px 0; }
+  .complete-icon { width: 48px; height: 48px; background: #e8f5e9; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .complete-title { font-size: 16px; font-weight: 700; color: var(--text); }
+  .complete-rows { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+  .complete-row { background: white; border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); }
+  .complete-row .row-label { font-size: 11px; color: var(--text-muted); font-weight: 500; min-width: 40px; }
+  .complete-row .row-value { font-size: 14px; font-weight: 600; color: var(--text); }
+
+  /* 마이크 + 음파 링 */
+  .mic-wrap { position: relative; display: flex; align-items: center; justify-content: center; width: 100px; height: 100px; flex-shrink: 0; }
+  .mic-ring { position: absolute; width: 64px; height: 64px; border-radius: 50%; border: 2px solid #e53935; opacity: 0; }
+  .mic-ring.r1 { animation: ring 2s ease-out infinite; }
+  .mic-ring.r2 { animation: ring 2s ease-out infinite 0.6s; }
+  .mic-ring.r3 { animation: ring 2s ease-out infinite 1.2s; }
+  @keyframes ring { 0%{transform:scale(1);opacity:0.6} 100%{transform:scale(2.4);opacity:0} }
+  .mic-ring.hidden { display: none; }
+  .mic-btn { position: relative; z-index: 2; width: 64px; height: 64px; border-radius: 50%; background: var(--primary); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(59,125,216,0.4); transition: background 0.2s; }
+  .mic-btn.listening { background: #e53935; box-shadow: 0 4px 20px rgba(229,57,53,0.4); }
+  .mic-btn.invisible { opacity: 0; pointer-events: none; }
+
+  .hidden { display: none !important; }
+
+  /* 실시간 팝업 — 텍스트 (조건 A) */
+  .realtime-popup { position: absolute; bottom: 108px; left: 16px; right: 16px; background: white; border-radius: 16px; padding: 10px 14px 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.12); border: 1px solid var(--border); z-index: 10; animation: slideUp 0.25s ease; }
+  @keyframes slideUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .popup-badge { font-size: 11px; color: #e53935; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
+  .popup-badge::before { content:''; width:6px; height:6px; border-radius:50%; background:#e53935; animation:blink2 1s ease-in-out infinite; display:inline-block; }
+  @keyframes blink2 { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .popup-row { display: flex; align-items: center; gap: 8px; }
+  .popup-row .popup-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+  .popup-row .popup-text { font-size: 15px; font-weight: 600; color: var(--text); }
+
+  /* 실시간 팝업 — 지도 (조건 B) */
+  .map-popup { position: absolute; bottom: 108px; left: 16px; right: 16px; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.15); border: 1px solid var(--border); z-index: 10; animation: slideUp 0.25s ease; }
+  .map-popup-badge { font-size: 11px; color: #e53935; font-weight: 600; padding: 8px 14px 4px; display: flex; align-items: center; gap: 4px; }
+  .map-popup-badge::before { content:''; width:6px; height:6px; border-radius:50%; background:#e53935; animation:blink2 1s ease-in-out infinite; display:inline-block; }
+  .popup-map { width: 100%; background: #e8edf2; }
+  .popup-map img { width: 100%; height: auto; display: block; }
+  .popup-map.compact { height: 100px; }
+  .popup-map.compact img { width: 100%; height: 100%; object-fit: cover; }
+  .popup-label { padding: 8px 14px 12px; display: flex; align-items: center; gap: 8px; }
+  .popup-label .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+  .popup-label span { font-size: 14px; font-weight: 600; color: var(--text); }
+
+  @media (max-height:900px) { body{align-items:flex-start;padding:20px} .phone-frame{border-radius:24px} }
+</style>
+</head>
+<body>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span id="timeDisplay">2:30</span>
+    <span>▲ 📶 🔋</span>
+  </div>
+  <div class="header">
+    <button class="pause-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+    </button>
+    <button class="end-btn">대화종료</button>
+  </div>
+  <div class="content">
+    <div class="question-box" id="questionBox">
+      <p id="questionText">안녕하세요!<br>DRT 호출을 도와드릴게요.</p>
+    </div>
+    <div class="ai-character">
+      <svg viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="70" cy="65" r="42" fill="#b8d4f5"/>
+        <circle cx="70" cy="65" r="34" fill="#d4e8ff"/>
+        <circle cx="70" cy="68" r="28" fill="#fde8d0"/>
+        <ellipse cx="60" cy="64" rx="5" ry="6" fill="#2c3e50"/>
+        <ellipse cx="80" cy="64" rx="5" ry="6" fill="#2c3e50"/>
+        <circle cx="62" cy="62" r="2" fill="white"/>
+        <circle cx="82" cy="62" r="2" fill="white"/>
+        <path d="M 62 76 Q 70 82 78 76" stroke="#c0784a" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <ellipse cx="54" cy="74" rx="6" ry="4" fill="#ffb3b3" opacity="0.5"/>
+        <ellipse cx="86" cy="74" rx="6" ry="4" fill="#ffb3b3" opacity="0.5"/>
+        <path d="M 30 60 Q 30 28 70 28 Q 110 28 110 60" stroke="#7aa8d8" stroke-width="6" fill="none" stroke-linecap="round"/>
+        <ellipse cx="30" cy="65" rx="10" ry="13" fill="#7aa8d8"/>
+        <ellipse cx="110" cy="65" rx="10" ry="13" fill="#7aa8d8"/>
+        <path d="M 96 78 Q 104 78 104 86" stroke="#7aa8d8" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <rect x="100" y="84" width="10" height="6" rx="3" fill="#7aa8d8"/>
+        <path d="M 42 96 Q 42 110 70 112 Q 98 110 98 96 Q 84 88 70 88 Q 56 88 42 96 Z" fill="#a8c4e8"/>
+      </svg>
+    </div>
+
+    <!-- 피드백 영역: 확인 단계에서만 결과 표시 -->
+    <div class="feedback-area">
+      <div id="stateIdle">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#dde3ec" stroke-width="2"/><path d="M12 8v4l3 3" stroke="#dde3ec" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <div id="stateWave" class="hidden wave-container">
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+      </div>
+      <!-- 확인 단계 텍스트 결과 (조건 A) -->
+      <div id="stateTextConfirm" class="hidden text-feedback">
+        <p class="label">인식 결과</p>
+        <p class="recognized-text" id="textConfirmContent"></p>
+        <div class="confirm-wave hidden" id="textConfirmWave">
+          <div class="cw-bar"></div><div class="cw-bar"></div><div class="cw-bar"></div>
+          <div class="cw-bar"></div><div class="cw-bar"></div><div class="cw-bar"></div>
+          <div class="cw-bar"></div><div class="cw-bar"></div><div class="cw-bar"></div>
+        </div>
+      </div>
+      <!-- 확인 단계 지도 결과 (조건 B) -->
+      <div id="stateMapConfirm" class="hidden map-feedback">
+        <div class="map-container" id="mapConfirmContainer"><img id="mapConfirmImg" src="" alt="지도"/></div>
+        <div class="map-text"><div class="dot"></div><span id="mapConfirmText"></span></div>
+        <div class="confirm-wave hidden" id="mapConfirmWave">
+          <div class="cw-bar"></div><div class="cw-bar"></div><div class="cw-bar"></div>
+          <div class="cw-bar"></div><div class="cw-bar"></div><div class="cw-bar"></div>
+          <div class="cw-bar"></div><div class="cw-bar"></div><div class="cw-bar"></div>
+        </div>
+      </div>
+      <!-- 호출 완료 -->
+      <div id="stateComplete" class="hidden complete-feedback">
+        <div class="complete-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#2e7d32" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <p class="complete-title">호출이 완료되었습니다</p>
+        <div class="complete-rows">
+          <div class="complete-row"><span class="row-label">출발</span><span class="row-value" id="completeDeparture"></span></div>
+          <div class="complete-row"><span class="row-label">도착</span><span class="row-value" id="completeDestination"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 마이크 + 링 -->
+    <div class="mic-wrap">
+      <div class="mic-ring r1 hidden" id="ring1"></div>
+      <div class="mic-ring r2 hidden" id="ring2"></div>
+      <div class="mic-ring r3 hidden" id="ring3"></div>
+      <button class="mic-btn" id="micBtn">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <line x1="12" y1="19" x2="12" y2="23" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <line x1="8" y1="23" x2="16" y2="23" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 실시간 팝업: 텍스트 (조건 A) -->
+  <div id="realtimeTextPopup" class="realtime-popup hidden">
+    <div class="popup-badge" id="realtimeTextBadge">인식 중...</div>
+    <div class="popup-row">
+      <div class="popup-dot"></div>
+      <span class="popup-text" id="realtimeTextContent"></span>
+    </div>
+  </div>
+
+  <!-- 실시간 팝업: 지도 (조건 B) -->
+  <div id="realtimeMapPopup" class="map-popup hidden">
+    <div class="map-popup-badge" id="realtimeMapBadge">인식 중...</div>
+    <div class="popup-map" id="realtimePopupMap"><img id="mapRealtimeImg" src="" alt="지도"/></div>
+    <div class="popup-label"><div class="dot"></div><span id="realtimeMapText"></span></div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  function updateTime() {
+    const now = new Date();
+    document.getElementById('timeDisplay').textContent = `${now.getHours()}:${now.getMinutes().toString().padStart(2,'0')}`;
+  }
+  updateTime(); setInterval(updateTime, 1000);
+
+  // ============================================================
+  // 시나리오 데이터
+  // TODO: imgSrc에 실제 스크린샷 파일명 확인
+  // ============================================================
+  const scenarios = {
+    0: {
+      // 연습: 출발지/목적지 모두 정상 — 본 실험과 다른 장소명 사용
+      departureQuestion: "어디서 타실 건가요?\n출발 장소를 말씀해 주세요.",
+      destinationQuestion: "어디로 가실 건가요?\n도착 장소를 말씀해 주세요.",
+      departure: {
+        normal: { text: "옥정중학교", confirmQ: "옥정중학교\n맞으신가요?", imgSrc: "practice_dep.png", pinY: "40%" },
+        error:  { text: "옥정중학교", confirmQ: "옥정중학교\n맞으신가요?", imgSrc: "practice_dep.png", pinY: "40%" }
+      },
+      destination: {
+        normal: { text: "옥정호수공원", confirmQ: "옥정호수공원\n맞으신가요?", imgSrc: "practice_dest.png", pinY: "40%" },
+        error:  { text: "옥정호수공원", confirmQ: "옥정호수공원\n맞으신가요?", imgSrc: "practice_dest.png", pinY: "40%" }
+      }
+    },
+    1: {
+      // 시나리오 1: 유사 장소명 혼동
+      // 출발지 오류: 힐스테이트 파티오포레 4단지 → 힐스테이트 파티오포레 2단지
+      // 목적지 오류: 옥정1동 행정복지센터 → 옥정2동 행정복지센터
+      departureQuestion: "어디서 타실 건가요?\n출발 장소를 말씀해 주세요.",
+      destinationQuestion: "어디로 가실 건가요?\n도착 장소를 말씀해 주세요.",
+      departure: {
+        normal: { text: "힐스테이트 파티오포레 4단지", confirmQ: "힐스테이트 파티오포레 4단지\n맞으신가요?", imgSrc: "s1_dep_normal.png", pinY: "39.5%" },
+        error:  { text: "힐스테이트 파티오포레 2단지", confirmQ: "힐스테이트 파티오포레 2단지\n맞으신가요?", imgSrc: "s1_dep_error.png",  pinY: "45.1%" }
+      },
+      destination: {
+        normal: { text: "옥정1동 행정복지센터", confirmQ: "옥정1동 행정복지센터\n맞으신가요?", imgSrc: "dest_normal.png",    pinY: "46.4%" },
+        error:  { text: "옥정2동 행정복지센터", confirmQ: "옥정2동 행정복지센터\n맞으신가요?", imgSrc: "dest_error.png",     pinY: "52.0%" }
+      }
+    },
+    2: {
+      // 시나리오 2: 비공식 장소명 사용
+      // 출발지 오류: 옥정1동 행정복지센터 → 옥정2동 행정복지센터
+      // 목적지 오류: 4단지(힐스테이트 파티오포레 4단지) → 월드메르디앙 라피네트 더 테라스 4단지
+      departureQuestion: "어디서 타실 건가요?\n출발 장소를 말씀해 주세요.",
+      destinationQuestion: "어디로 가실 건가요?\n도착 장소를 말씀해 주세요.",
+      departure: {
+        normal: { text: "옥정1동 행정복지센터", confirmQ: "옥정1동 행정복지센터\n맞으신가요?", imgSrc: "dest_normal.png",  pinY: "46.4%" },
+        error:  { text: "옥정2동 행정복지센터", confirmQ: "옥정2동 행정복지센터\n맞으신가요?", imgSrc: "dest_error.png",   pinY: "52.0%" }
+      },
+      destination: {
+        normal: { text: "힐스테이트 파티오포레 4단지",       confirmQ: "힐스테이트 파티오포레 4단지\n맞으신가요?",       imgSrc: "s1_dep_normal.png",  pinY: "39.5%" },
+        error:  { text: "월드메르디앙 라피네트 더 테라스 4단지", confirmQ: "월드메르디앙 라피네트 더 테라스 4단지\n맞으신가요?", imgSrc: "s2_dest_error.png",  pinY: "56.9%" }
+      }
+    }
+  };
+
+  // condition: 'A' = 비공간적(텍스트만), 'B' = 공간적(텍스트+지도)
+  let sc = 1, cond = 'A', currentPayload = 'normal', errorLoc = 'dep';
+
+  // Firebase 초기화 및 수신
+  const firebaseConfig = {
+    apiKey: "AIzaSyAp34rx0ZoBngViLTXqiUtCdtQRQKMnTDA",
+    authDomain: "drt-experiment.firebaseapp.com",
+    databaseURL: "https://drt-experiment-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "drt-experiment",
+    storageBucket: "drt-experiment.firebasestorage.app",
+    messagingSenderId: "515540322218",
+    appId: "1:515540322218:web:b389b0f68610a94d5f0dd3"
+  };
+  const _app = initializeApp(firebaseConfig);
+  const db = getDatabase(_app);
+  const stateRef = ref(db, 'experiment/state');
+
+  onValue(stateRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data) return;
+    const { type, scenario, condition, state, payload, errorLocation } = data;
+    if (type === 'SET_SCENARIO') { sc = scenario; reset(); }
+    if (type === 'SET_CONDITION') { cond = condition; reset(); }
+    if (type === 'SET_ERROR_LOCATION') { errorLoc = errorLocation; reset(); }
+    if (type === 'SET_STATE') { errorLoc = errorLocation || errorLoc; applyState(state, payload); }
+  });
+
+  function reset() {
+    hideAll();
+    document.getElementById('stateIdle').classList.remove('hidden');
+    document.getElementById('micBtn').classList.remove('listening', 'invisible');
+    setRings(false);
+    setQ('안녕하세요!<br>DRT 호출을 도와드릴게요.', false);
+  }
+
+  function hideAll() {
+    ['stateIdle','stateWave','stateTextConfirm','stateMapConfirm','stateComplete',
+     'realtimeTextPopup','realtimeMapPopup'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    ['textConfirmWave','mapConfirmWave'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    // compact 해제
+    const mc = document.getElementById('mapConfirmContainer');
+    mc.classList.remove('compact');
+    document.getElementById('mapConfirmImg').style.objectPosition = '';
+    // 팝업 지도 compact 해제
+    document.getElementById('realtimePopupMap').classList.remove('compact');
+    document.getElementById('mapRealtimeImg').style.objectPosition = '';
+  }
+
+  function setQ(text, isConfirm) {
+    document.getElementById('questionText').innerHTML = text.replace('\n','<br>');
+    document.getElementById('questionBox').classList.toggle('confirm', isConfirm);
+  }
+
+  function setListening(on) {
+    document.getElementById('micBtn').classList.toggle('listening', on);
+  }
+
+  function setRings(on) {
+    ['ring1','ring2','ring3'].forEach(id => document.getElementById(id).classList.toggle('hidden', !on));
+  }
+
+  // 실시간 팝업 표시
+  function showRT(text, imgSrc, pinY, badge) {
+    if (cond === 'A') {
+      document.getElementById('realtimeTextPopup').classList.remove('hidden');
+      document.getElementById('realtimeTextContent').textContent = text;
+      const badgeEl = document.getElementById('realtimeTextBadge');
+      badgeEl.textContent = badge || '인식 중...';
+      badgeEl.style.display = (badge === '') ? 'none' : '';
+    } else {
+      document.getElementById('realtimeMapPopup').classList.remove('hidden');
+      document.getElementById('realtimeMapText').textContent = text;
+      const img = document.getElementById('mapRealtimeImg');
+      img.src = imgSrc;
+      img.style.objectPosition = pinY ? `center ${pinY}` : '';
+      const badgeEl = document.getElementById('realtimeMapBadge');
+      badgeEl.textContent = badge || '인식 중...';
+      badgeEl.style.display = (badge === '') ? 'none' : '';
+    }
+  }
+
+  // 확인 단계 결과 표시
+  function showConfirmResult(text, imgSrc, pinY) {
+    if (cond === 'A') {
+      document.getElementById('stateTextConfirm').classList.remove('hidden');
+      document.getElementById('textConfirmContent').textContent = text;
+    } else {
+      document.getElementById('stateMapConfirm').classList.remove('hidden');
+      document.getElementById('mapConfirmText').textContent = text;
+      document.getElementById('mapConfirmImg').src = imgSrc;
+    }
+  }
+
+  function applyConfirmCompact(pinY) {
+    if (cond === 'B') {
+      const mc = document.getElementById('mapConfirmContainer');
+      mc.classList.add('compact');
+      document.getElementById('mapConfirmImg').style.objectPosition = `center ${pinY || '40%'}`;
+    }
+  }
+
+  function showConfirmWave(pinY) {
+    ['textConfirmWave','mapConfirmWave'].forEach(id => {
+      const el = document.getElementById(id);
+      const parent = el.closest('#stateTextConfirm, #stateMapConfirm');
+      if (parent && !parent.classList.contains('hidden')) el.classList.remove('hidden');
+    });
+    applyConfirmCompact(pinY);
+  }
+
+  // ── 음성 안내 (mp3 파일 재생) ──
+  let currentAudio = null;
+
+  function speak(filename) {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    }
+    currentAudio = new Audio(filename);
+    currentAudio.play().catch(() => {}); // 자동재생 정책 오류 무시
+  }
+
+  function stopSpeech() {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    }
+  }
+
+  // 시나리오·오류위치·정상오류에 따른 확인질문 음성 파일 반환
+  function getConfirmVoice(type, isError) {
+    // 연습: 오류 없음
+    if (sc === 0) {
+      return type === 'dep' ? 'voice_confirm_practice_dep.mp3' : 'voice_confirm_practice_dest.mp3';
+    }
+
+    // 오류가 발생한 쪽 음성
+    if (isError) {
+      if (sc === 1) {
+        // S1 출발지오류: 파티오포레2단지 / S1 목적지오류: 옥정2동
+        return type === 'dep' ? 'voice_confirm_dep_error_s1.mp3' : 'voice_confirm_dest_error_s1.mp3';
+      }
+      if (sc === 2) {
+        // S2 출발지오류: 옥정2동(=dest_error_s1) / S2 목적지오류: 월드메르디앙(=dest_error_s2)
+        return type === 'dep' ? 'voice_confirm_dest_error_s1.mp3' : 'voice_confirm_dest_error_s2.mp3';
+      }
+    }
+
+    // 정상 쪽 음성 — 시나리오2는 출발지/목적지 장소가 시나리오1과 반대
+    if (sc === 1) {
+      // S1 출발지정상: 파티오포레4단지(dep_normal) / S1 목적지정상: 옥정1동(dest_normal)
+      return type === 'dep' ? 'voice_confirm_dep_normal.mp3' : 'voice_confirm_dest_normal.mp3';
+    }
+    if (sc === 2) {
+      // S2 출발지정상: 옥정1동(dest_normal) / S2 목적지정상: 파티오포레4단지(dep_normal)
+      return type === 'dep' ? 'voice_confirm_dest_normal.mp3' : 'voice_confirm_dep_normal.mp3';
+    }
+  }
+
+  function applyState(state, payload) {
+    const d = scenarios[sc];
+    const dep  = d.departure.error  ? (payload === 'error' ? d.departure.error  : d.departure.normal)  : d.departure.normal;
+    const dest = d.destination.error ? (payload === 'error' ? d.destination.error : d.destination.normal) : d.destination.normal;
+
+    const isSpeaking = ['dep_speaking','dep_rt_normal','dep_rt_error',
+      'dep_confirm_speaking_normal','dep_confirm_speaking_error',
+      'dest_speaking','dest_rt_normal','dest_rt_error',
+      'dest_confirm_speaking_normal','dest_confirm_speaking_error'].includes(state);
+
+    hideAll();
+    setListening(isSpeaking);
+    setRings(isSpeaking);
+
+    // 발화 중 단계에서는 음성 중단
+    if (isSpeaking) stopSpeech();
+
+    switch(state) {
+      case 'idle':
+        document.getElementById('stateIdle').classList.remove('hidden');
+        setQ('안녕하세요!<br>DRT 호출을 도와드릴게요.', false);
+        speak('voice_idle.mp3'); break;
+
+      // ── 출발지 ──
+      case 'dep_question':
+        document.getElementById('stateIdle').classList.remove('hidden');
+        setQ(d.departureQuestion, false);
+        speak('voice_dep_question.mp3'); break;
+
+      case 'dep_speaking':
+        document.getElementById('stateWave').classList.remove('hidden');
+        setQ(d.departureQuestion, false); break;
+
+      case 'dep_rt_normal':
+        document.getElementById('stateWave').classList.remove('hidden');
+        setQ(d.departureQuestion, false);
+        showRT(d.departure.normal.text, d.departure.normal.imgSrc, d.departure.normal.pinY); break;
+
+      case 'dep_rt_error':
+        document.getElementById('stateWave').classList.remove('hidden');
+        setQ(d.departureQuestion, false);
+        showRT(d.departure.error.text, d.departure.error.imgSrc, d.departure.error.pinY); break;
+
+      case 'dep_confirm_normal':
+        setQ(d.departure.normal.confirmQ, true);
+        showConfirmResult(d.departure.normal.text, d.departure.normal.imgSrc, d.departure.normal.pinY);
+        speak(getConfirmVoice('dep', false)); break;
+
+      case 'dep_confirm_speaking_normal':
+        setQ(d.departure.normal.confirmQ, true);
+        showConfirmResult(d.departure.normal.text, d.departure.normal.imgSrc, d.departure.normal.pinY);
+        showConfirmWave(d.departure.normal.pinY); break;
+
+      case 'dep_confirmed':
+        setQ('출발지가 확정되었습니다.\n잠시 후 목적지를 여쭤볼게요.', false);
+        showConfirmResult(d.departure.normal.text, d.departure.normal.imgSrc, d.departure.normal.pinY);
+        speak('voice_dep_confirmed.mp3'); break;
+
+      case 'dep_confirm_error':
+        setQ(d.departure.error.confirmQ, true);
+        showConfirmResult(d.departure.error.text, d.departure.error.imgSrc, d.departure.error.pinY);
+        speak(getConfirmVoice('dep', true)); break;
+
+      case 'dep_confirm_speaking_error':
+        setQ(d.departure.error.confirmQ, true);
+        showConfirmResult(d.departure.error.text, d.departure.error.imgSrc, d.departure.error.pinY);
+        showConfirmWave(d.departure.error.pinY); break;
+
+      case 'dep_confirmed_error':
+        setQ('출발지가 확정되었습니다.\n잠시 후 목적지를 여쭤볼게요.', false);
+        showConfirmResult(d.departure.error.text, d.departure.error.imgSrc, d.departure.error.pinY);
+        speak('voice_dep_confirmed.mp3'); break;
+
+      // ── 목적지 ──
+      case 'dest_question':
+        document.getElementById('stateIdle').classList.remove('hidden');
+        setQ(d.destinationQuestion, false);
+        speak('voice_dest_question.mp3'); break;
+
+      case 'dest_speaking':
+        document.getElementById('stateWave').classList.remove('hidden');
+        setQ(d.destinationQuestion, false); break;
+
+      case 'dest_rt_normal':
+        document.getElementById('stateWave').classList.remove('hidden');
+        setQ(d.destinationQuestion, false);
+        showRT(d.destination.normal.text, d.destination.normal.imgSrc, d.destination.normal.pinY); break;
+
+      case 'dest_rt_error':
+        document.getElementById('stateWave').classList.remove('hidden');
+        setQ(d.destinationQuestion, false);
+        showRT(d.destination.error.text, d.destination.error.imgSrc, d.destination.error.pinY); break;
+
+      case 'dest_confirm_normal':
+        setQ(d.destination.normal.confirmQ, true);
+        showConfirmResult(d.destination.normal.text, d.destination.normal.imgSrc, d.destination.normal.pinY);
+        speak(getConfirmVoice('dest', false)); break;
+
+      case 'dest_confirm_speaking_normal':
+        setQ(d.destination.normal.confirmQ, true);
+        showConfirmResult(d.destination.normal.text, d.destination.normal.imgSrc, d.destination.normal.pinY);
+        showConfirmWave(d.destination.normal.pinY); break;
+
+      case 'dest_confirm_error':
+        setQ(d.destination.error.confirmQ, true);
+        showConfirmResult(d.destination.error.text, d.destination.error.imgSrc, d.destination.error.pinY);
+        speak(getConfirmVoice('dest', true)); break;
+
+      case 'dest_confirm_speaking_error':
+        setQ(d.destination.error.confirmQ, true);
+        showConfirmResult(d.destination.error.text, d.destination.error.imgSrc, d.destination.error.pinY);
+        showConfirmWave(d.destination.error.pinY); break;
+
+      // ── 완료 ──
+      case 'complete':
+        document.getElementById('micBtn').classList.add('invisible');
+        setQ('호출이 완료되었습니다.', false);
+        document.getElementById('stateComplete').classList.remove('hidden');
+        document.getElementById('completeDeparture').textContent = dep.text;
+        document.getElementById('completeDestination').textContent = dest.text;
+        speak('voice_complete.mp3'); break;
+
+      default: reset();
+    }
+  }
+
+  reset();
+</script>
+</body>
+</html>
