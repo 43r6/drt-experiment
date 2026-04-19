@@ -414,7 +414,7 @@
     }
   }
 
-  function setScenario(s) {
+  window.setScenario = function(s) {
     currentScenario = s;
     const label = s === 0 ? '연습' : `시나리오 ${s}`;
     document.getElementById('statusScenario').textContent = label;
@@ -424,9 +424,9 @@
     updateFlowButtons();
     sendToFirebase({ type:'SET_SCENARIO', scenario:s, errorLocation: currentErrorLocation });
     fullReset();
-  }
+  };
 
-  function setErrorLocation(loc) {
+  window.setErrorLocation = function(loc) {
     currentErrorLocation = loc;
     ['elDepBtn','elDestBtn'].forEach(id => document.getElementById(id).classList.remove('active'));
     document.getElementById(loc === 'dep' ? 'elDepBtn' : 'elDestBtn').classList.add('active');
@@ -435,9 +435,9 @@
     updateFlowButtons();
     sendToFirebase({ type:'SET_ERROR_LOCATION', errorLocation: loc });
     fullReset();
-  }
+  };
 
-  function setCondition(c) {
+  window.setCondition = function(c) {
     currentCondition = c;
     document.getElementById('statusCondition').textContent = `조건 ${c}`;
     ['cAbtn','cBbtn'].forEach(id => document.getElementById(id).classList.remove('active'));
@@ -447,7 +447,7 @@
     document.getElementById('condDesc').textContent = info.desc;
     sendToFirebase({ type:'SET_CONDITION', condition:c });
     fullReset();
-  }
+  };
 
   let logEntries = [];
 
@@ -456,7 +456,6 @@
     const depHasError  = !isPractice && currentErrorLocation === 'dep';
     const destHasError = !isPractice && currentErrorLocation === 'dest';
 
-    // 출발지: 오류 세트/정상 세트 통째로 활성/비활성
     const depNormal = document.getElementById('depNormalSet');
     const depError  = document.getElementById('depErrorSet');
     const depUnlock = document.getElementById('depUnlockWrap');
@@ -466,7 +465,6 @@
     depError.style.pointerEvents  = depHasError  ? 'auto' : 'none';
     depUnlock.style.display       = depHasError  ? 'block' : 'none';
 
-    // 목적지: 오류 세트/정상 세트 통째로 활성/비활성
     const destNormal = document.getElementById('destNormalSet');
     const destError  = document.getElementById('destErrorSet');
     const destUnlock = document.getElementById('destUnlockWrap');
@@ -476,7 +474,6 @@
     destError.style.pointerEvents  = destHasError ? 'auto' : 'none';
     destUnlock.style.display       = destHasError ? 'block' : 'none';
 
-    // 연습: 오류 세트 모두 비활성, 정상 세트만 활성
     if (isPractice) {
       depNormal.style.opacity  = '1';  depNormal.style.pointerEvents  = 'auto';
       depError.style.opacity   = '0.3'; depError.style.pointerEvents  = 'none';
@@ -486,35 +483,34 @@
       destUnlock.style.display = 'none';
     }
 
-    // 오류 미인지 버튼 및 수정발화 전환 버튼
     document.getElementById('depMissBtn').style.display    = depHasError  ? 'inline-block' : 'none';
     document.getElementById('destMissBtn').style.display   = destHasError ? 'inline-block' : 'none';
     document.getElementById('depUnlockWrap').style.display  = depHasError  ? 'block' : 'none';
     document.getElementById('destUnlockWrap').style.display = destHasError ? 'block' : 'none';
   }
 
-  function unlockDepNormal() {
+  window.unlockDepNormal = function() {
     const depNormal = document.getElementById('depNormalSet');
     depNormal.style.opacity = '1';
     depNormal.style.pointerEvents = 'auto';
-    addLog(`출발지 수정 발화 발생 — 정상 흐름 전환`);
-  }
+    addLog('출발지 수정 발화 발생 — 정상 흐름 전환');
+  };
 
-  function unlockDestNormal() {
+  window.unlockDestNormal = function() {
     const destNormal = document.getElementById('destNormalSet');
     destNormal.style.opacity = '1';
     destNormal.style.pointerEvents = 'auto';
-    addLog(`목적지 수정 발화 발생 — 정상 흐름 전환`);
-  }
+    addLog('목적지 수정 발화 발생 — 정상 흐름 전환');
+  };
 
-  function recordMiss(location) {
+  window.recordMiss = function(location) {
     const now = new Date().toLocaleTimeString('ko-KR');
     const label = location === 'dep' ? '출발지' : '목적지';
     const scenarioLabel = currentScenario === 0 ? '연습' : `시나리오 ${currentScenario}`;
     const entry = `[${now}] ${scenarioLabel} / 조건 ${currentCondition} — ${label} 오류 미인지 통과`;
     logEntries.push({ type: 'miss', text: entry });
     renderLog();
-  }
+  };
 
   function addLog(text) {
     const now = new Date().toLocaleTimeString('ko-KR');
@@ -530,23 +526,21 @@
     ).join('');
   }
 
-  function setState(state) {
-    // 오류 위치에 따라 payload 자동 결정
+  window.setState = function(state) {
     const isErrorState = state.includes('_rt_error') || state.includes('_rt_e');
     const payload = isErrorState ? 'error' : 'normal';
-
     document.getElementById('statusState').textContent = stateNames[state] || state;
     Object.values(btnMap).forEach(id => document.getElementById(id)?.classList.remove('active'));
     document.getElementById(btnMap[state])?.classList.add('active');
     sendToFirebase({ type:'SET_STATE', state, payload, errorLocation: currentErrorLocation });
-  }
+  };
 
-  function fullReset() { setState('idle'); updateFlowButtons(); }
+  function fullReset() { window.setState('idle'); updateFlowButtons(); }
 
   // 초기화
-  setCondition('A');
-  setScenario(1);
-  setErrorLocation('dep');
+  window.setCondition('A');
+  window.setScenario(1);
+  window.setErrorLocation('dep');
 </script>
 </body>
 </html>
