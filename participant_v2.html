@@ -103,7 +103,11 @@
   .popup-label .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
   .popup-label span { font-size: 14px; font-weight: 600; color: var(--text); }
 
-  @media (max-height:900px) { body{align-items:flex-start;padding:20px} .phone-frame{border-radius:24px} }
+  @media (max-width: 480px) {
+    body { align-items: stretch; justify-content: stretch; background: var(--surface); overflow: hidden; }
+    .phone-frame { width: 100%; height: 100vh; height: 100dvh; border-radius: 0; box-shadow: none; }
+  }
+  @media (max-height:900px) and (min-width:481px) { body{align-items:flex-start;padding:20px} .phone-frame{border-radius:24px} }
 </style>
 </head>
 <body>
@@ -395,6 +399,21 @@
     });
     applyConfirmCompact(pinY);
   }
+
+  // ── 모바일 음성 자동재생 잠금해제 ──
+  // 첫 터치/클릭 시 무음 오디오를 재생해서 브라우저 자동재생 정책 해제
+  let audioUnlocked = false;
+  function unlockAudio() {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    const silent = new Audio('voice_idle.mp3');
+    silent.volume = 0.01;
+    silent.play().catch(() => {});
+    document.removeEventListener('touchstart', unlockAudio);
+    document.removeEventListener('click', unlockAudio);
+  }
+  document.addEventListener('touchstart', unlockAudio, { once: true });
+  document.addEventListener('click', unlockAudio, { once: true });
 
   // ── 음성 안내 (mp3 파일 재생) ──
   let currentAudio = null;
