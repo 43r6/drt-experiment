@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>실험자 제어판 — DRT 실험</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #f0f4f8;
+    --surface: #ffffff;
+    --surface-soft: #f7f9fc;
+    --border: #dde3ec;
+    --border-strong: #c4cdd9;
+    --primary: #3b7dd8;
+    --primary-hover: #2d6bc4;
+    --primary-soft: #e8f0fb;
+    --text: #1a2332;
+    --text-muted: #6b7c93;
+    --text-dim: #9aa6b8;
+    --success: #2e9c5e;
+    --warning: #d97706;
+    --error: #dc2626;
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  .app { display: grid; grid-template-columns: 280px 1fr; height: 100vh; }
+
+  /* ============================================================
+     좌측 사이드바
+     ============================================================ */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    gap: 12px;
+    overflow-y: auto;
+  }
+
+  .reset-btn {
+    align-self: flex-start;
+    padding: 6px 12px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .reset-btn:hover { color: var(--text); border-color: var(--border-strong); }
+
+  /* 드롭다운 */
+  .dropdown { position: relative; }
+  .dropdown-btn {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.15s;
+  }
+  .dropdown-btn:hover { border-color: var(--border-strong); }
+  .dropdown-btn.open { border-color: var(--primary); }
+  .dropdown-btn .label { color: var(--text-muted); font-size: 11px; font-weight: 400; display: block; margin-bottom: 2px; }
+  .dropdown-btn .value { color: var(--text); font-size: 13px; font-weight: 600; }
+  .dropdown-btn .chevron { transition: transform 0.2s; color: var(--text-muted); font-size: 11px; }
+  .dropdown-btn.open .chevron { transform: rotate(180deg); }
+
+  .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    overflow: hidden;
+    z-index: 10;
+  }
+  .dropdown-menu.open { display: block; }
+  .dropdown-item {
+    width: 100%;
+    padding: 10px 14px;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.1s;
+  }
+  .dropdown-item:hover { background: var(--surface-soft); }
+  .dropdown-item.active { background: var(--primary-soft); color: var(--primary); font-weight: 500; }
+
+  /* 비활성 (연습 시 오류 위치) */
+  .dropdown.disabled { opacity: 0.4; pointer-events: none; }
+
+  /* 조건 안내 */
+  .cond-note {
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .cond-note .ct { font-weight: 600; color: var(--text); display: block; margin-bottom: 3px; }
+
+  /* 오류 안내 */
+  .error-info {
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .error-info .ei-label {
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-size: 9px;
+    margin-bottom: 4px;
+  }
+
+  /* 로그 영역 */
+  .log-section {
+    margin-top: auto;
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .log-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .log-list {
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-height: 100px;
+    overflow-y: auto;
+  }
+  .log-empty { color: var(--text-dim); }
+  .log-entry { padding: 2px 6px; border-radius: 3px; margin-bottom: 2px; }
+  .log-entry.miss { background: rgba(217,119,6,0.1); color: var(--warning); }
+  .log-entry.info { background: rgba(59,125,216,0.08); color: var(--primary); }
+
+  /* ============================================================
+     우측 메인
+     ============================================================ */
+  .main {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 32px;
+    overflow: hidden;
+  }
+
+  .conn-indicator {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .dot-live {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: blink 2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* STEP 카드 영역 */
+  .step-row {
+    display: grid;
+    grid-template-columns: 1fr 1.8fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+    margin-top: 8px;
+    max-width: 1100px;
+    width: 100%;
+    align-self: center;
+  }
+  .step-card {
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    text-align: center;
+    transition: all 0.2s;
+  }
+  .step-card.side {
+    opacity: 0.55;
+    background: var(--surface-soft);
+    padding: 12px 14px;
+  }
+  .step-card.current {
+    border-color: var(--primary);
+    border-width: 2px;
+    box-shadow: 0 4px 16px rgba(59,125,216,0.08);
+    padding: 18px 16px;
+  }
+  .step-card .step-num {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .step-card.side .step-num { font-size: 9px; }
+  .step-card.current .step-num { color: var(--primary); font-weight: 600; font-size: 11px; }
+  .step-card .step-name {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .step-card.side .step-name { font-size: 12px; }
+  .step-card.current .step-name {
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .step-card.empty .step-num,
+  .step-card.empty .step-name { color: var(--text-dim); }
+
+  /* 미러링 영역 — 피험자 폰 원본 크기로 띄우고 0.65배 축소 */
+  .mirror-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    min-height: 0;
+  }
+  /* 축소된 표시 영역 (0.65배) */
+  .mirror-stage {
+    width: 254px;   /* 390 * 0.65 */
+    height: 549px;  /* 844 * 0.65 */
+    position: relative;
+    flex-shrink: 0;
+  }
+  /* iframe은 원본 크기로 + scale 0.65 적용 */
+  .mirror-frame {
+    width: 390px;
+    height: 844px;
+    border-radius: 40px;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+    background: white;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: scale(0.65);
+    transform-origin: top left;
+  }
+  .mirror-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+    pointer-events: none;
+  }
+
+  /* 컨트롤 버튼 영역 */
+  .control-row {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .ctrl-btn {
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .ctrl-btn:hover:not(:disabled) {
+    background: var(--surface-soft);
+    border-color: var(--border-strong);
+  }
+  .ctrl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ctrl-btn.prev { color: var(--text-muted); font-weight: 500; }
+  .ctrl-btn.next {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+    font-size: 16px;
+  }
+  .ctrl-btn.next:hover:not(:disabled) {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+  }
+
+  /* 분기 버튼 */
+  .branch-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .branch-prompt {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--warning);
+    padding: 8px 12px;
+    background: rgba(217,119,6,0.08);
+    border: 1px solid rgba(217,119,6,0.25);
+    border-radius: 8px;
+    margin-bottom: 4px;
+  }
+  .branch-btn {
+    padding: 16px 12px;
+    border-radius: 12px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+  .branch-btn .blabel {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-bottom: 4px;
+  }
+  .branch-btn:hover { background: var(--surface-soft); }
+  .branch-btn.yes { border-color: rgba(220,38,38,0.4); }
+  .branch-btn.yes:hover { background: rgba(220,38,38,0.06); border-color: var(--error); }
+  .branch-btn.no { border-color: rgba(46,156,94,0.4); }
+  .branch-btn.no:hover { background: rgba(46,156,94,0.06); border-color: var(--success); }
+
+  /* 종료 안내 */
+  .end-notice {
+    margin-top: 24px;
+    padding: 18px;
+    text-align: center;
+    font-size: 14px;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ============ 좌측 사이드바 ============ -->
+  <aside class="sidebar">
+    <button class="reset-btn" onclick="fullReset()">전체 초기화</button>
+
+    <div class="dropdown" id="ddScenario">
+      <button class="dropdown-btn" onclick="toggleDropdown('Scenario')">
+        <span>
+          <span class="label">시나리오</span>
+          <span class="value" id="ddScenarioVal">시나리오 1</span>
+        </span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="dropdown-menu">
+        <button class="dropdown-item" onclick="setScenario(0)">연습 (정상 흐름)</button>
+        <button class="dropdown-item active" onclick="setScenario(1)">시나리오 1 — 유사 장소명</button>
+        <button class="dropdown-item" onclick="setScenario(2)">시나리오 2 — 비공식 장소명</button>
+      </div>
+    </div>
+
+    <div class="dropdown" id="ddCondition">
+      <button class="dropdown-btn" onclick="toggleDropdown('Condition')">
+        <span>
+          <span class="label">조건</span>
+          <span class="value" id="ddConditionVal">조건 A — 텍스트만</span>
+        </span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="dropdown-menu">
+        <button class="dropdown-item active" onclick="setCondition('A')">조건 A — 텍스트만</button>
+        <button class="dropdown-item" onclick="setCondition('B')">조건 B — 텍스트+지도</button>
+      </div>
+    </div>
+
+    <div class="dropdown" id="ddErrorLoc">
+      <button class="dropdown-btn" onclick="toggleDropdown('ErrorLoc')">
+        <span>
+          <span class="label">오류 발생 위치</span>
+          <span class="value" id="ddErrorLocVal">출발지</span>
+        </span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="dropdown-menu">
+        <button class="dropdown-item active" onclick="setErrorLocation('dep')">출발지</button>
+        <button class="dropdown-item" onclick="setErrorLocation('dest')">목적지</button>
+      </div>
+    </div>
+
+    <div class="cond-note">
+      <span class="ct" id="condTitle">조건 A — 텍스트만</span>
+      <span id="condDesc">발화 도중 실시간으로 텍스트 팝업이 나타납니다.</span>
+    </div>
+
+    <div class="error-info">
+      <div class="ei-label">현재 시나리오 오류 내용</div>
+      <div id="errorInfoText">—</div>
+    </div>
+
+    <div class="log-section">
+      <div class="log-label">관찰 기록</div>
+      <div class="log-list" id="logList"><span class="log-empty">기록 없음</span></div>
+    </div>
+  </aside>
+
+  <!-- ============ 우측 메인 ============ -->
+  <main class="main">
+    <div class="conn-indicator"><span class="dot-live"></span>연결 활성</div>
+
+    <!-- STEP 카드 3개 -->
+    <div class="step-row">
+      <div class="step-card side empty" id="stepPrev">
+        <div class="step-num">이전</div>
+        <div class="step-name">—</div>
+      </div>
+      <div class="step-card current" id="stepCur">
+        <div class="step-num">현재</div>
+        <div class="step-name">대기</div>
+      </div>
+      <div class="step-card side empty" id="stepNext">
+        <div class="step-num">다음</div>
+        <div class="step-name">—</div>
+      </div>
+    </div>
+
+    <!-- 피험자 화면 미러링 -->
+    <div class="mirror-area">
+      <div class="mirror-stage">
+        <div class="mirror-frame">
+          <iframe id="participantFrame" src="participant_v3.html?silent=1" title="피험자 화면 미리보기"></iframe>
+        </div>
+      </div>
+    </div>
+
+    <!-- 컨트롤 영역 (다음/이전 또는 분기 또는 종료) -->
+    <div id="controlArea">
+      <div class="control-row" id="navArea">
+        <button class="ctrl-btn prev" id="prevBtn" onclick="goPrev()" disabled>← 이전</button>
+        <button class="ctrl-btn next" id="nextBtn" onclick="goNext()">다음 →</button>
+      </div>
+
+      <div class="branch-row" id="branchRT" style="display:none;">
+        <div class="branch-prompt">피험자가 실시간으로 수정 발화를 했나요?</div>
+        <button class="ctrl-btn prev" onclick="goPrev()">← 이전</button>
+        <button class="branch-btn no" onclick="branchRT(false)">
+          <div class="blabel">수정 발화 없음</div>
+          <div>그대로 진행<br>(확인 단계로)</div>
+        </button>
+        <button class="branch-btn yes" onclick="branchRT(true)">
+          <div class="blabel">수정 발화 발생</div>
+          <div>인식 결과 갱신<br>(정상 흐름 전환)</div>
+        </button>
+      </div>
+
+      <div class="branch-row" id="branchConfirm" style="display:none;">
+        <div class="branch-prompt">피험자가 오류를 인지했나요?</div>
+        <button class="ctrl-btn prev" onclick="goPrev()">← 이전</button>
+        <button class="branch-btn yes" onclick="branchConfirm(false)">
+          <div class="blabel">"네" — 오류 미인지</div>
+          <div>그대로 확정<br>(자동 로그 기록)</div>
+        </button>
+        <button class="branch-btn no" onclick="branchConfirm(true)">
+          <div class="blabel">"아니요" — 수정 발화</div>
+          <div>실시간 화면으로<br>(정상 갱신)</div>
+        </button>
+      </div>
+
+      <div class="end-notice" id="endNotice" style="display:none;">
+        호출 완료 — 다음 시나리오로 넘어가려면 좌측에서 시나리오를 변경하세요
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAp34rx0ZoBngViLTXqiUtCdtQRQKMnTDA",
+    authDomain: "drt-experiment.firebaseapp.com",
+    databaseURL: "https://drt-experiment-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "drt-experiment",
+    storageBucket: "drt-experiment.firebasestorage.app",
+    messagingSenderId: "515540322218",
+    appId: "1:515540322218:web:b389b0f68610a94d5f0dd3"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const stateRef = ref(db, 'experiment/state');
+
+  function sendToFirebase(data) {
+    set(stateRef, { ...data, timestamp: Date.now() + Math.random() });
+  }
+
+  // ============================================================
+  // 상태
+  // ============================================================
+  let currentScenario = 1;
+  let currentCondition = 'A';
+  let currentErrorLocation = 'dep';
+  let currentStateIndex = 0;
+  let currentSequence = [];
+  let history = [];
+  let logEntries = [];
+  let depConfirmType = null;
+  let destConfirmType = null;
+
+  // STEP 메타
+  const stepMeta = {
+    idle:                          { num: '시작 전',  name: '대기 상태', payload: 'normal' },
+    dep_question:                  { num: 'STEP 1',  name: '출발지 질문', payload: 'normal' },
+    dep_speaking:                  { num: 'STEP 2',  name: '출발지 발화 중', payload: 'normal' },
+    dep_rt_normal:                 { num: 'STEP 3',  name: '실시간 인식 (정상)', payload: 'normal' },
+    dep_rt_error:                  { num: 'STEP 3',  name: '실시간 인식 (오류)', payload: 'error' },
+    dep_rt_corrected:              { num: 'STEP 3+', name: '실시간 인식 (수정 후)', payload: 'normal' },
+    dep_confirm_normal:            { num: 'STEP 4',  name: '확인 질문 (정상)', payload: 'normal' },
+    dep_confirm_speaking_normal:   { num: 'STEP 5',  name: '확인 발화 중 (정상)', payload: 'normal' },
+    dep_confirm_error:             { num: 'STEP 4a', name: '확인 질문 (오류)', payload: 'error' },
+    dep_confirm_speaking_error:    { num: 'STEP 5a', name: '확인 발화 중 (오류)', payload: 'error' },
+    dep_confirmed:                 { num: 'STEP 6',  name: '출발지 확정', payload: 'normal' },
+    dep_confirmed_error:           { num: 'STEP 6a', name: '출발지 확정 (오류)', payload: 'error' },
+    dest_question:                 { num: 'STEP 7',  name: '목적지 질문', payload: 'normal' },
+    dest_speaking:                 { num: 'STEP 8',  name: '목적지 발화 중', payload: 'normal' },
+    dest_rt_normal:                { num: 'STEP 9',  name: '실시간 인식 (정상)', payload: 'normal' },
+    dest_rt_error:                 { num: 'STEP 9',  name: '실시간 인식 (오류)', payload: 'error' },
+    dest_rt_corrected:             { num: 'STEP 9+', name: '실시간 인식 (수정 후)', payload: 'normal' },
+    dest_confirm_normal:           { num: 'STEP 10', name: '확인 질문 (정상)', payload: 'normal' },
+    dest_confirm_speaking_normal:  { num: 'STEP 11', name: '확인 발화 중 (정상)', payload: 'normal' },
+    dest_confirm_error:            { num: 'STEP 10a',name: '확인 질문 (오류)', payload: 'error' },
+    dest_confirm_speaking_error:   { num: 'STEP 11a',name: '확인 발화 중 (오류)', payload: 'error' },
+    complete:                      { num: 'STEP 12', name: '호출 완료', payload: 'normal' },
+  };
+
+  // ============================================================
+  // 시퀀스 빌드
+  // ============================================================
+  function buildSequence() {
+    const isPractice = currentScenario === 0;
+    const depError = !isPractice && currentErrorLocation === 'dep';
+    const destError = !isPractice && currentErrorLocation === 'dest';
+
+    const seq = ['idle', 'dep_question', 'dep_speaking'];
+    seq.push(depError ? 'dep_rt_error' : 'dep_rt_normal');
+    seq.push('__DEP_CONFIRM__');
+    seq.push('dest_question', 'dest_speaking');
+    seq.push(destError ? 'dest_rt_error' : 'dest_rt_normal');
+    seq.push('__DEST_CONFIRM__');
+    seq.push('complete');
+    return seq;
+  }
+
+  function expandSequence(rawSeq) {
+    const expanded = [];
+    for (const s of rawSeq) {
+      if (s === '__DEP_CONFIRM__') {
+        if (depConfirmType === 'normal' || depConfirmType === null) {
+          expanded.push('dep_confirm_normal', 'dep_confirm_speaking_normal', 'dep_confirmed');
+        } else if (depConfirmType === 'error_pending') {
+          expanded.push('dep_confirm_error', 'dep_confirm_speaking_error');
+        } else if (depConfirmType === 'error_then_miss') {
+          expanded.push('dep_confirm_error', 'dep_confirm_speaking_error', 'dep_confirmed_error');
+        } else if (depConfirmType === 'error_then_correct') {
+          expanded.push('dep_confirm_error', 'dep_confirm_speaking_error', 'dep_rt_corrected', 'dep_confirm_normal', 'dep_confirm_speaking_normal', 'dep_confirmed');
+        } else if (depConfirmType === 'rt_corrected') {
+          expanded.push('dep_confirm_normal', 'dep_confirm_speaking_normal', 'dep_confirmed');
+        }
+      } else if (s === '__DEST_CONFIRM__') {
+        if (destConfirmType === 'normal' || destConfirmType === null) {
+          expanded.push('dest_confirm_normal', 'dest_confirm_speaking_normal');
+        } else if (destConfirmType === 'error_pending') {
+          expanded.push('dest_confirm_error', 'dest_confirm_speaking_error');
+        } else if (destConfirmType === 'error_then_miss') {
+          expanded.push('dest_confirm_error', 'dest_confirm_speaking_error');
+        } else if (destConfirmType === 'error_then_correct') {
+          expanded.push('dest_confirm_error', 'dest_confirm_speaking_error', 'dest_rt_corrected', 'dest_confirm_normal', 'dest_confirm_speaking_normal');
+        } else if (destConfirmType === 'rt_corrected') {
+          expanded.push('dest_confirm_normal', 'dest_confirm_speaking_normal');
+        }
+      } else {
+        expanded.push(s);
+      }
+    }
+    return expanded;
+  }
+
+  function rebuildSequence() {
+    currentSequence = expandSequence(buildSequence());
+  }
+
+  // 분기점 판별
+  function isRTErrorBranch() {
+    const cur = currentSequence[currentStateIndex];
+    return cur === 'dep_rt_error' || cur === 'dest_rt_error';
+  }
+  function isConfirmErrorBranch() {
+    const cur = currentSequence[currentStateIndex];
+    return cur === 'dep_confirm_speaking_error' || cur === 'dest_confirm_speaking_error';
+  }
+  function isAtBranchPoint() {
+    return isRTErrorBranch() || isConfirmErrorBranch();
+  }
+
+  // ============================================================
+  // 네비게이션
+  // ============================================================
+  window.goNext = function() {
+    if (isAtBranchPoint()) return;
+    if (currentStateIndex >= currentSequence.length - 1) return;
+    history.push(currentStateIndex);
+    if (history.length > 1) history.shift();
+    currentStateIndex++;
+    applyCurrentState();
+  };
+
+  window.goPrev = function() {
+    if (history.length === 0) return;
+    currentStateIndex = history.pop();
+    applyCurrentState();
+  };
+
+  window.branchRT = function(corrected) {
+    const cur = currentSequence[currentStateIndex];
+    history.push(currentStateIndex);
+    if (history.length > 1) history.shift();
+    const isDep = cur === 'dep_rt_error';
+
+    if (corrected) {
+      addLog((isDep ? '출발지' : '목적지') + ' 실시간 수정 발화 발생 — 정상 흐름 전환', 'info');
+      if (isDep) depConfirmType = 'rt_corrected';
+      else destConfirmType = 'rt_corrected';
+      rebuildSequence();
+      const errState = isDep ? 'dep_rt_error' : 'dest_rt_error';
+      const corrState = isDep ? 'dep_rt_corrected' : 'dest_rt_corrected';
+      const idx = currentSequence.indexOf(errState);
+      if (idx >= 0 && currentSequence[idx + 1] !== corrState) {
+        currentSequence.splice(idx + 1, 0, corrState);
+      }
+      currentStateIndex = currentSequence.indexOf(errState) + 1;
+    } else {
+      if (isDep) depConfirmType = 'error_pending';
+      else destConfirmType = 'error_pending';
+      rebuildSequence();
+      const errState = isDep ? 'dep_rt_error' : 'dest_rt_error';
+      const newIdx = currentSequence.indexOf(errState);
+      if (newIdx >= 0) currentStateIndex = newIdx + 1;
+    }
+    applyCurrentState();
+  };
+
+  window.branchConfirm = function(corrected) {
+    const cur = currentSequence[currentStateIndex];
+    history.push(currentStateIndex);
+    if (history.length > 1) history.shift();
+    const isDep = cur === 'dep_confirm_speaking_error';
+
+    if (corrected) {
+      addLog((isDep ? '출발지' : '목적지') + ' 확인 단계 수정 발화 — 정상 흐름 전환', 'info');
+      if (isDep) depConfirmType = 'error_then_correct';
+      else destConfirmType = 'error_then_correct';
+    } else {
+      recordMiss(isDep ? 'dep' : 'dest');
+      if (isDep) depConfirmType = 'error_then_miss';
+      else destConfirmType = 'error_then_miss';
+    }
+    rebuildSequence();
+    const newIdx = currentSequence.indexOf(cur);
+    if (newIdx >= 0) currentStateIndex = newIdx + 1;
+    applyCurrentState();
+  };
+
+  function recordMiss(loc) {
+    const now = new Date().toLocaleTimeString('ko-KR');
+    const label = loc === 'dep' ? '출발지' : '목적지';
+    const sLabel = currentScenario === 0 ? '연습' : `시나리오 ${currentScenario}`;
+    logEntries.push({ type: 'miss', text: `[${now}] ${sLabel}/${currentCondition} ${label} 미인지` });
+    renderLog();
+  }
+
+  function addLog(text, type) {
+    const now = new Date().toLocaleTimeString('ko-KR');
+    logEntries.push({ type: type || 'info', text: `[${now}] ${text}` });
+    renderLog();
+  }
+
+  function renderLog() {
+    const el = document.getElementById('logList');
+    if (logEntries.length === 0) { el.innerHTML = '<span class="log-empty">기록 없음</span>'; return; }
+    el.innerHTML = logEntries.map(e => `<div class="log-entry ${e.type}">${e.text}</div>`).join('');
+    el.scrollTop = el.scrollHeight;
+  }
+
+  // ============================================================
+  // 화면 갱신
+  // ============================================================
+  function applyCurrentState() {
+    const state = currentSequence[currentStateIndex];
+    const meta = stepMeta[state];
+    sendToFirebase({
+      type: 'SET_STATE',
+      state,
+      payload: meta.payload,
+      errorLocation: currentErrorLocation
+    });
+    updateStepCards();
+    updateControls();
+  }
+
+  function updateStepCards() {
+    const cur = currentSequence[currentStateIndex];
+    const prev = currentStateIndex > 0 ? currentSequence[currentStateIndex - 1] : null;
+    const next = currentStateIndex < currentSequence.length - 1 ? currentSequence[currentStateIndex + 1] : null;
+
+    const curMeta = stepMeta[cur];
+    document.getElementById('stepCur').querySelector('.step-num').textContent = curMeta.num;
+    document.getElementById('stepCur').querySelector('.step-name').textContent = curMeta.name;
+
+    const prevCard = document.getElementById('stepPrev');
+    if (prev) {
+      const m = stepMeta[prev];
+      prevCard.classList.remove('empty');
+      prevCard.querySelector('.step-num').textContent = m.num;
+      prevCard.querySelector('.step-name').textContent = m.name;
+    } else {
+      prevCard.classList.add('empty');
+      prevCard.querySelector('.step-num').textContent = '이전';
+      prevCard.querySelector('.step-name').textContent = '—';
+    }
+
+    const nextCard = document.getElementById('stepNext');
+    if (isAtBranchPoint()) {
+      nextCard.classList.add('empty');
+      nextCard.querySelector('.step-num').textContent = '다음';
+      nextCard.querySelector('.step-name').textContent = '분기 선택 필요';
+    } else if (next) {
+      const m = stepMeta[next];
+      nextCard.classList.remove('empty');
+      nextCard.querySelector('.step-num').textContent = m.num;
+      nextCard.querySelector('.step-name').textContent = m.name;
+    } else {
+      nextCard.classList.add('empty');
+      nextCard.querySelector('.step-num').textContent = '다음';
+      nextCard.querySelector('.step-name').textContent = '—';
+    }
+  }
+
+  function updateControls() {
+    const cur = currentSequence[currentStateIndex];
+    const isComplete = cur === 'complete';
+    const navArea = document.getElementById('navArea');
+    const branchRT = document.getElementById('branchRT');
+    const branchConfirm = document.getElementById('branchConfirm');
+    const endNotice = document.getElementById('endNotice');
+
+    navArea.style.display = 'none';
+    branchRT.style.display = 'none';
+    branchConfirm.style.display = 'none';
+    endNotice.style.display = 'none';
+
+    if (isComplete) {
+      endNotice.style.display = 'block';
+    } else if (isRTErrorBranch()) {
+      branchRT.style.display = 'grid';
+    } else if (isConfirmErrorBranch()) {
+      branchConfirm.style.display = 'grid';
+    } else {
+      navArea.style.display = 'grid';
+    }
+
+    document.getElementById('prevBtn').disabled = (history.length === 0);
+    document.getElementById('nextBtn').disabled = (currentStateIndex >= currentSequence.length - 1);
+  }
+
+  // ============================================================
+  // 드롭다운
+  // ============================================================
+  window.toggleDropdown = function(name) {
+    const dd = document.getElementById('dd' + name);
+    const btn = dd.querySelector('.dropdown-btn');
+    const menu = dd.querySelector('.dropdown-menu');
+    const isOpen = menu.classList.contains('open');
+
+    // 모든 드롭다운 닫기
+    document.querySelectorAll('.dropdown-btn').forEach(b => b.classList.remove('open'));
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+
+    // 다른 거였으면 새로 열기
+    if (!isOpen) {
+      btn.classList.add('open');
+      menu.classList.add('open');
+    }
+  };
+
+  // 외부 클릭 시 닫기
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.dropdown')) {
+      document.querySelectorAll('.dropdown-btn').forEach(b => b.classList.remove('open'));
+      document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+    }
+  });
+
+  function closeAllDropdowns() {
+    document.querySelectorAll('.dropdown-btn').forEach(b => b.classList.remove('open'));
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+  }
+
+  function setDropdownActive(menuId, idx) {
+    const items = document.querySelectorAll(`#${menuId} .dropdown-item`);
+    items.forEach((it, i) => it.classList.toggle('active', i === idx));
+  }
+
+  // ============================================================
+  // 사전 설정
+  // ============================================================
+  const errorGuide = {
+    0: { dep: null, dest: null },
+    1: {
+      dep:  '출발지: "통인동" → "통의동"으로 오인식',
+      dest: '목적지: "계동" → "재동"으로 오인식'
+    },
+    2: {
+      dep:  '출발지: "2단지(창신 쌍용 2단지)" → "경희궁 자이 2단지"로 오인식',
+      dest: '목적지: "장난감 거리(창신동 문구완구거리)" → "천호동 완구거리"로 오인식'
+    }
+  };
+
+  const condInfo = {
+    'A': { title: '조건 A — 텍스트만', desc: '발화 도중 실시간으로 텍스트 팝업이 나타납니다.' },
+    'B': { title: '조건 B — 텍스트+지도', desc: '발화 도중 실시간으로 지도 팝업과 텍스트가 함께 나타납니다.' },
+  };
+
+  const scenarioLabels = {
+    0: '연습 (정상 흐름)',
+    1: '시나리오 1 — 유사 장소명',
+    2: '시나리오 2 — 비공식 장소명'
+  };
+
+  window.setScenario = function(s) {
+    currentScenario = s;
+    document.getElementById('ddScenarioVal').textContent = scenarioLabels[s];
+    setDropdownActive('ddScenario', s);
+    closeAllDropdowns();
+
+    const ddErr = document.getElementById('ddErrorLoc');
+    if (s === 0) ddErr.classList.add('disabled');
+    else ddErr.classList.remove('disabled');
+
+    updateErrorInfo();
+    sendToFirebase({ type: 'SET_SCENARIO', scenario: s, errorLocation: currentErrorLocation });
+    fullReset();
+  };
+
+  window.setCondition = function(c) {
+    currentCondition = c;
+    document.getElementById('ddConditionVal').textContent = condInfo[c].title;
+    setDropdownActive('ddCondition', c === 'A' ? 0 : 1);
+    document.getElementById('condTitle').textContent = condInfo[c].title;
+    document.getElementById('condDesc').textContent = condInfo[c].desc;
+    closeAllDropdowns();
+    sendToFirebase({ type: 'SET_CONDITION', condition: c });
+    fullReset();
+  };
+
+  window.setErrorLocation = function(loc) {
+    currentErrorLocation = loc;
+    document.getElementById('ddErrorLocVal').textContent = (loc === 'dep' ? '출발지' : '목적지');
+    setDropdownActive('ddErrorLoc', loc === 'dep' ? 0 : 1);
+    closeAllDropdowns();
+    updateErrorInfo();
+    sendToFirebase({ type: 'SET_ERROR_LOCATION', errorLocation: loc });
+    fullReset();
+  };
+
+  function updateErrorInfo() {
+    const txtEl = document.getElementById('errorInfoText');
+    if (currentScenario === 0) {
+      txtEl.textContent = '연습 시나리오 — 오류 없음';
+    } else {
+      txtEl.textContent = errorGuide[currentScenario][currentErrorLocation] || '—';
+    }
+  }
+
+  // ============================================================
+  // 초기화
+  // ============================================================
+  window.fullReset = function() {
+    const isPractice = currentScenario === 0;
+    const depHasError = !isPractice && currentErrorLocation === 'dep';
+    const destHasError = !isPractice && currentErrorLocation === 'dest';
+    depConfirmType = depHasError ? 'error_pending' : 'normal';
+    destConfirmType = destHasError ? 'error_pending' : 'normal';
+    rebuildSequence();
+    currentStateIndex = 0;
+    history = [];
+    applyCurrentState();
+  };
+
+  // 시작
+  updateErrorInfo();
+  rebuildSequence();
+  applyCurrentState();
+</script>
+</body>
+</html>
